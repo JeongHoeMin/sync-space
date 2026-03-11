@@ -47,9 +47,26 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  handleDisconnect(client: Socket) {
+  async handleDisconnect(client: Socket) {
     console.log(`Client disconnected: ${client.id}`);
-    // 추가: 퇴장 처리 로직 (DB 참여자 목록 업데이트 등) 필요시 구현
+    
+    const user = client.data.user;
+    const channelId = client.data.channelId;
+
+    if (user && channelId) {
+      // 남아있는 유저들에게 브로드캐스팅
+      this.server.to(channelId).emit('user_disconnected', { userId: user.sub, email: user.email });
+      console.log(`User ${user.email} disconnected from channel ${channelId}`);
+
+      try {
+        await this.participantRepo.delete({ 
+          channel: { id: channelId }, 
+          user: { id: user.sub } 
+        });
+      } catch (e) {
+        console.error('Failed to remove participant on disconnect:', e.message);
+      }
+    }
   }
 
   @SubscribeMessage('join_channel')
@@ -59,6 +76,9 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {
     const userId = client.data.user.sub;
     const channelId = data.channelId;
+    
+    // 연결이 끊어졌을 때를 대비해 소켓에 채널 ID 저장
+    client.data.channelId = channelId;
     
     // 1. 채널 존재 여부 확인
     const channel = await this.channelRepo.findOne({ where: { id: channelId } });
@@ -104,7 +124,7 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('send_message')
   async handleMessage(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { channelId: string; content: string; type?: MessageType },
+    @MessageBody() data: { channelId: string; content: string; type?: MessageType; tempId?: string },
   ) {
     const userId = client.data.user.sub;
     const user = await this.userRepo.findOne({ where: { id: userId } });
@@ -127,6 +147,7 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
       content: savedMessage.content,
       type: savedMessage.message_type,
       created_at: savedMessage.created_at,
+      tempId: data.tempId, // 낙관적 UI 연동을 위한 임시 ID 반환
     });
   }
 }

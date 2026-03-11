@@ -15,7 +15,7 @@ export declare class AppGateway implements OnGatewayConnection, OnGatewayDisconn
     server: Server;
     constructor(jwtService: JwtService, channelRepo: Repository<Channel>, participantRepo: Repository<ChannelParticipant>, messageRepo: Repository<Message>, userRepo: Repository<User>);
     handleConnection(client: Socket): Promise<void>;
-    handleDisconnect(client: Socket): void;
+    handleDisconnect(client: Socket): Promise<void>;
     handleJoinChannel(client: Socket, data: {
         channelId: string;
     }): Promise<{
@@ -29,6 +29,7 @@ export declare class AppGateway implements OnGatewayConnection, OnGatewayDisconn
         channelId: string;
         content: string;
         type?: MessageType;
+        tempId?: string;
     }): Promise<{
         error: string;
     }>;

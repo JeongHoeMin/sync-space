@@ -44,12 +44,28 @@ let AppGateway = class AppGateway {
             client.disconnect();
         }
     }
-    handleDisconnect(client) {
+    async handleDisconnect(client) {
         console.log(`Client disconnected: ${client.id}`);
+        const user = client.data.user;
+        const channelId = client.data.channelId;
+        if (user && channelId) {
+            this.server.to(channelId).emit('user_disconnected', { userId: user.sub, email: user.email });
+            console.log(`User ${user.email} disconnected from channel ${channelId}`);
+            try {
+                await this.participantRepo.delete({
+                    channel: { id: channelId },
+                    user: { id: user.sub }
+                });
+            }
+            catch (e) {
+                console.error('Failed to remove participant on disconnect:', e.message);
+            }
+        }
     }
     async handleJoinChannel(client, data) {
         const userId = client.data.user.sub;
         const channelId = data.channelId;
+        client.data.channelId = channelId;
         const channel = await this.channelRepo.findOne({ where: { id: channelId } });
         if (!channel)
             return { error: 'Channel not found' };
@@ -97,6 +113,7 @@ let AppGateway = class AppGateway {
             content: savedMessage.content,
             type: savedMessage.message_type,
             created_at: savedMessage.created_at,
+            tempId: data.tempId,
         });
     }
 };

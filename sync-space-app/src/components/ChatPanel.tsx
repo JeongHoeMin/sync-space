@@ -8,6 +8,9 @@ interface ChatMessage {
   content: string;
   type: 'TEXT' | 'IMAGE' | 'FILE';
   created_at: string;
+  tempId?: string;
+  isSending?: boolean;
+  isError?: boolean;
 }
 
 interface ChatPanelProps {
@@ -19,8 +22,15 @@ export default function ChatPanel({ channelId }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [hasNextPage, setHasNextPage] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const observerTarget = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -40,7 +50,17 @@ export default function ChatPanel({ channelId }: ChatPanelProps) {
     });
 
     newSocket.on('receive_message', (msg: ChatMessage) => {
-      setMessages((prev) => [...prev, msg]);
+      setMessages((prev) => {
+        if (msg.tempId) {
+          const index = prev.findIndex(m => m.id === msg.tempId);
+          if (index !== -1) {
+            const newMessages = [...prev];
+            newMessages[index] = msg;
+            return newMessages;
+          }
+        }
+        return [...prev, msg];
+      });
       scrollToBottom();
     });
 
@@ -51,6 +71,61 @@ export default function ChatPanel({ channelId }: ChatPanelProps) {
     };
   }, [channelId]);
 
+  const fetchPreviousMessages = async () => {
+    // 메시지가 없거나(초기 로딩 전) 다음 페이지가 없거나 로딩 중이면 중단
+    if (!hasNextPage || isLoadingMore || messages.length === 0) return;
+    
+    setIsLoadingMore(true);
+    const cursor = messages[0].id;
+    const token = localStorage.getItem('token');
+    
+    try {
+      const res = await fetch(`http://localhost:3000/channels/${channelId}/messages?cursor=${cursor}&limit=30`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      
+      if (data.messages && data.messages.length > 0) {
+        const container = scrollContainerRef.current;
+        const oldScrollHeight = container?.scrollHeight || 0;
+        const oldScrollTop = container?.scrollTop || 0;
+        
+        setMessages(prev => [...data.messages, ...prev]);
+        setHasNextPage(data.hasNextPage);
+        
+        setTimeout(() => {
+          if (container) {
+            const newScrollHeight = container.scrollHeight;
+            container.scrollTop = newScrollHeight - oldScrollHeight + oldScrollTop;
+          }
+        }, 0);
+      } else {
+        setHasNextPage(false);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting) {
+          fetchPreviousMessages();
+        }
+      },
+      { threshold: 0.1 }
+    );
+    
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+    
+    return () => observer.disconnect();
+  }, [messages, hasNextPage, isLoadingMore]);
+
   const scrollToBottom = () => {
     setTimeout(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -60,38 +135,158 @@ export default function ChatPanel({ channelId }: ChatPanelProps) {
   const handleSendText = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim() || !socket) return;
-    socket.emit('send_message', { channelId, content: inputText, type: 'TEXT' });
+    
+    let email = 'me';
+    try {
+      const token = localStorage.getItem('token');
+      if (token) {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        email = payload.email || 'me';
+      }
+    } catch (e) {}
+    
+    const tempId = `temp-${Date.now()}`;
+    const newMsg: ChatMessage = {
+      id: tempId,
+      sender: { id: 'me', email },
+      content: inputText,
+      type: 'TEXT',
+      created_at: new Date().toISOString(),
+      isSending: true
+    };
+    
+    setMessages(prev => [...prev, newMsg]);
+    scrollToBottom();
+    
+    socket.emit('send_message', { channelId, content: inputText, type: 'TEXT', tempId });
     setInputText('');
+    
+    // 5초 타임아웃
+    setTimeout(() => {
+      setMessages(prev => {
+        const idx = prev.findIndex(m => m.id === tempId);
+        if (idx !== -1 && prev[idx].isSending) {
+           const next = [...prev];
+           next[idx] = { ...next[idx], isSending: false, isError: true };
+           return next;
+        }
+        return prev;
+      });
+    }, 5000);
+  };
+  
+  const handleResend = (msg: ChatMessage) => {
+    if (!socket || !msg.isError) return;
+    
+    // 낙관적 UI 재설정
+    setMessages(prev => {
+      const idx = prev.findIndex(m => m.id === msg.id);
+      if (idx !== -1) {
+         const next = [...prev];
+         next[idx] = { ...next[idx], isSending: true, isError: false };
+         return next;
+      }
+      return prev;
+    });
+    
+    socket.emit('send_message', { channelId, content: msg.content, type: msg.type, tempId: msg.id });
+    
+    setTimeout(() => {
+      setMessages(prev => {
+        const idx = prev.findIndex(m => m.id === msg.id);
+        if (idx !== -1 && prev[idx].isSending) {
+           const next = [...prev];
+           next[idx] = { ...next[idx], isSending: false, isError: true };
+           return next;
+        }
+        return prev;
+      });
+    }, 5000);
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement> | File) => {
+    let file: File | undefined;
+    if ('target' in e) {
+      file = e.target.files?.[0];
+    } else {
+      file = e as File;
+    }
+    
     if (!file || !socket) return;
 
     setIsUploading(true);
+    setUploadProgress(0);
     const formData = new FormData();
     formData.append('file', file);
 
     const token = localStorage.getItem('token');
-    try {
-      const res = await fetch('http://localhost:3000/upload', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      });
+    
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', 'http://localhost:3000/upload', true);
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
 
-      if (!res.ok) throw new Error('Upload failed');
-      const data = await res.json();
-      
-      const type = file.type.startsWith('image/') ? 'IMAGE' : 'FILE';
-      const content = JSON.stringify({ url: data.url, filename: data.originalname });
-      
-      socket.emit('send_message', { channelId, content, type });
-    } catch (err) {
-      alert('파일 업로드에 실패했습니다.');
-    } finally {
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        const percentComplete = Math.round((event.loaded / event.total) * 100);
+        setUploadProgress(percentComplete);
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        const data = JSON.parse(xhr.responseText);
+        const type = file.type.startsWith('image/') ? 'IMAGE' : 'FILE';
+        const content = JSON.stringify({ url: data.url, filename: data.originalname });
+        socket.emit('send_message', { channelId, content, type });
+      } else {
+        if (xhr.status === 413) {
+          showToast('20MB 이하의 파일만 업로드 가능합니다.');
+        } else if (xhr.status === 415) {
+          showToast('지원하지 않는 파일 형식입니다.');
+        } else {
+          showToast('파일 업로드에 실패했습니다.');
+        }
+      }
       setIsUploading(false);
+      setUploadProgress(0);
       if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    xhr.onerror = () => {
+      showToast('네트워크 오류가 발생했습니다.');
+      setIsUploading(false);
+      setUploadProgress(0);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    xhr.send(formData);
+  };
+  
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      handleFileUpload(files[0]);
     }
   };
   
@@ -115,19 +310,55 @@ export default function ChatPanel({ channelId }: ChatPanelProps) {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-zinc-900 border-l border-zinc-800 w-80 shadow-2xl z-[60] pointer-events-auto absolute right-0 top-0">
+    <div 
+      className="flex flex-col h-screen bg-zinc-900 border-l border-zinc-800 w-80 shadow-2xl z-[60] pointer-events-auto absolute right-0 top-0"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* 토스트 메시지 */}
+      {toastMessage && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-red-500/90 text-white text-sm px-4 py-2 rounded-lg shadow-lg z-[70] backdrop-blur-sm whitespace-nowrap">
+          {toastMessage}
+        </div>
+      )}
+
+      {/* 드래그 오버레이 */}
+      {isDragging && (
+        <div className="absolute inset-0 bg-indigo-500/20 backdrop-blur-sm border-2 border-dashed border-indigo-400 z-[65] flex items-center justify-center pointer-events-none">
+          <div className="bg-zinc-900/90 px-6 py-4 rounded-xl shadow-2xl flex flex-col items-center gap-2">
+            <Paperclip size={32} className="text-indigo-400" />
+            <p className="text-white font-medium">이곳에 파일을 놓으세요</p>
+          </div>
+        </div>
+      )}
+
       <div className="p-4 border-b border-zinc-800 bg-zinc-900/80 backdrop-blur">
         <h2 className="text-lg font-bold text-white">라이브 채팅</h2>
       </div>
       
-      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 scrollbar-thin scrollbar-thumb-zinc-700">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 scrollbar-thin scrollbar-thumb-zinc-700">
+        {hasNextPage && messages.length > 0 && (
+          <div ref={observerTarget} className="h-4 w-full flex items-center justify-center shrink-0">
+            {isLoadingMore && <span className="text-zinc-500 text-xs">이전 대화 로딩 중...</span>}
+          </div>
+        )}
         {messages.map((msg, index) => {
-          const isMe = false; // 현재 로그인된 사용자 검증 (시간상 생략, 전부 좌측 정렬)
+          const isMe = msg.isSending || msg.isError || false; // 낙관적 렌더링은 무조건 내 메시지 (우측)
+          // 실제로는 사용자 검증이 필요하지만 시연용
           return (
             <div key={msg.id || index} className={`flex flex-col w-full ${isMe ? 'items-end' : 'items-start'}`}>
               <span className="text-xs text-zinc-500 mb-1">{msg.sender.email.split('@')[0]}</span>
-              <div className={`p-3 rounded-2xl shadow-sm max-w-[90%] text-sm ${isMe ? 'bg-indigo-600 text-white rounded-tr-sm' : 'bg-zinc-800 text-zinc-200 rounded-tl-sm'}`}>
-                {renderMessageContent(msg)}
+              <div className="flex items-center gap-2">
+                {isMe && msg.isError && (
+                  <button onClick={() => handleResend(msg)} className="text-xs text-red-500 hover:underline">재전송</button>
+                )}
+                {isMe && msg.isSending && (
+                  <span className="text-xs text-zinc-400">⏳</span>
+                )}
+                <div className={`p-3 rounded-2xl shadow-sm max-w-[90%] text-sm ${isMe ? 'bg-indigo-600 text-white rounded-tr-sm' : 'bg-zinc-800 text-zinc-200 rounded-tl-sm'} ${msg.isError ? 'opacity-50 ring-2 ring-red-500' : ''}`}>
+                  {renderMessageContent(msg)}
+                </div>
               </div>
             </div>
           );
@@ -135,7 +366,19 @@ export default function ChatPanel({ channelId }: ChatPanelProps) {
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-4 border-t border-zinc-800 bg-zinc-900/80 backdrop-blur">
+      <div className="p-4 border-t border-zinc-800 bg-zinc-900/80 backdrop-blur shrink-0 relative">
+        {isUploading && (
+          <div className="absolute -top-1 left-0 right-0 h-1 bg-zinc-800">
+            <div 
+              className="h-full bg-indigo-500 transition-all duration-300 relative"
+              style={{ width: `${uploadProgress}%` }}
+            >
+              <div className="absolute -top-5 right-0 text-[10px] text-zinc-400 bg-zinc-800 px-1 rounded">
+                {uploadProgress}%
+              </div>
+            </div>
+          </div>
+        )}
         <form onSubmit={handleSendText} className="flex gap-2">
           <input
             type="file"

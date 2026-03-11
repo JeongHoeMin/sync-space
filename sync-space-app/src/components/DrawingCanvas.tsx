@@ -25,6 +25,8 @@ export interface DrawingCanvasRef {
 
 const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(({ isDrawingMode, color, size, isEraser, onDraw }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const drawRafRef = useRef<number | null>(null);
+  const lastEmitTimeRef = useRef<number>(0);
 
   useImperativeHandle(ref, () => ({
     drawFromRemote: (data: DrawData) => {
@@ -70,19 +72,34 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(({ isDraw
       ctx.beginPath();
       ctx.moveTo(e.clientX, e.clientY);
       onDraw({ type: 'start', x: e.clientX, y: e.clientY, color, size, isEraser });
+      lastEmitTimeRef.current = Date.now();
     }
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (e.buttons !== 1 || !isDrawingMode) return;
-    const ctx = canvasRef.current?.getContext('2d');
-    if (ctx) {
-      ctx.globalCompositeOperation = isEraser ? 'destination-out' : 'source-over';
-      ctx.lineTo(e.clientX, e.clientY);
-      if (!isEraser) ctx.strokeStyle = color;
-      ctx.lineWidth = size;
-      ctx.stroke();
-      onDraw({ type: 'draw', x: e.clientX, y: e.clientY, color, size, isEraser });
+    
+    const clientX = e.clientX;
+    const clientY = e.clientY;
+
+    if (drawRafRef.current === null) {
+      drawRafRef.current = requestAnimationFrame(() => {
+        const ctx = canvasRef.current?.getContext('2d');
+        if (ctx) {
+          ctx.globalCompositeOperation = isEraser ? 'destination-out' : 'source-over';
+          ctx.lineTo(clientX, clientY);
+          if (!isEraser) ctx.strokeStyle = color;
+          ctx.lineWidth = size;
+          ctx.stroke();
+
+          const now = Date.now();
+          if (now - lastEmitTimeRef.current >= 30) {
+            onDraw({ type: 'draw', x: clientX, y: clientY, color, size, isEraser });
+            lastEmitTimeRef.current = now;
+          }
+        }
+        drawRafRef.current = null;
+      });
     }
   };
 

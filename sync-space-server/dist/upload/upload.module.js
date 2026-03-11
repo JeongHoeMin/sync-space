@@ -28,6 +28,19 @@ exports.UploadModule = UploadModule = __decorate([
                         cb(null, uniqueSuffix);
                     },
                 }),
+                limits: {
+                    fileSize: 20 * 1024 * 1024,
+                },
+                fileFilter: (req, file, cb) => {
+                    const allowedTypes = [
+                        'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+                        'application/pdf', 'application/zip', 'application/x-zip-compressed', 'application/x-zip'
+                    ];
+                    if (!allowedTypes.includes(file.mimetype)) {
+                        return cb(new common_1.HttpException('지원하지 않는 파일 형식입니다', common_1.HttpStatus.UNSUPPORTED_MEDIA_TYPE), false);
+                    }
+                    cb(null, true);
+                },
             }),
         ],
         controllers: [upload_controller_1.UploadController],
