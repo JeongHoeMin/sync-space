@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../entities/user.entity';
 import { JwtService } from '@nestjs/jwt';
-import * as crypto from 'crypto';
+import * as bcrypt from 'bcrypt';
 import { RegisterDto, LoginDto } from './dto/auth.dto';
 
 @Injectable()
@@ -14,20 +14,17 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  // 간단한 패스워드 해싱 유틸
-  private hashPassword(password: string): string {
-    return crypto.createHash('sha256').update(password).digest('hex');
-  }
-
   async register(dto: RegisterDto) {
     const existingUser = await this.userRepository.findOne({ where: { email: dto.email } });
     if (existingUser) {
       throw new ConflictException('Email already exists');
     }
 
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
+
     const user = this.userRepository.create({
       email: dto.email,
-      password_hash: this.hashPassword(dto.password),
+      password_hash: hashedPassword,
     });
 
     await this.userRepository.save(user);
@@ -45,7 +42,8 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    if (user.password_hash !== this.hashPassword(dto.password)) {
+    const isPasswordValid = await bcrypt.compare(dto.password, user.password_hash);
+    if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
 

@@ -23,6 +23,7 @@ import { Message } from './entities/message.entity';
       entities: [User, Channel, ChannelParticipant, Message],
       synchronize: true, // 개발 중 자동 스키마 동기화 (프로덕션에서는 막아야 함)
     }),
+    TypeOrmModule.forFeature([User, Channel, ChannelParticipant, Message]),
     AuthModule,
   ],
   controllers: [AppController, ChannelController, LiveKitController],
