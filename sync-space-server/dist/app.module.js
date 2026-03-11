@@ -12,6 +12,7 @@ const typeorm_1 = require("@nestjs/typeorm");
 const app_controller_1 = require("./app.controller");
 const app_service_1 = require("./app.service");
 const auth_module_1 = require("./auth/auth.module");
+const upload_module_1 = require("./upload/upload.module");
 const app_gateway_1 = require("./gateway/app.gateway");
 const channel_controller_1 = require("./channels/channel.controller");
 const livekit_module_1 = require("./livekit/livekit.module");
@@ -38,6 +39,7 @@ exports.AppModule = AppModule = __decorate([
             typeorm_1.TypeOrmModule.forFeature([user_entity_1.User, channel_entity_1.Channel, channel_participant_entity_1.ChannelParticipant, message_entity_1.Message]),
             auth_module_1.AuthModule,
             livekit_module_1.LivekitModule,
+            upload_module_1.UploadModule,
         ],
         controllers: [app_controller_1.AppController, channel_controller_1.ChannelController],
         providers: [app_service_1.AppService, app_gateway_1.AppGateway],

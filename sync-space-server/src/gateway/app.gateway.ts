@@ -79,6 +79,25 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     // 4. 기존 사용자들에게 입장 알림
     this.server.to(channelId).emit('user_joined', { userId, email: client.data.user.email });
+
+    // 5. 과거 메시지 전송 (최대 50개)
+    const messages = await this.messageRepo.find({
+      where: { channel: { id: channelId } },
+      relations: ['sender'],
+      order: { created_at: 'ASC' },
+      take: 50, // 필요시 페이징 구현
+    });
+
+    const historyMessages = messages.map(msg => ({
+      id: msg.id,
+      sender: { id: msg.sender.id, email: msg.sender.email },
+      content: msg.content,
+      type: msg.message_type,
+      created_at: msg.created_at,
+    }));
+
+    client.emit('channel_history', { messages: historyMessages });
+
     return { success: true };
   }
 

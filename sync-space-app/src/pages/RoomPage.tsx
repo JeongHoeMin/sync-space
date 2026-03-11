@@ -4,6 +4,8 @@ import { MonitorUp, PenTool, MousePointer2, LogOut } from 'lucide-react';
 import { Room, RoomEvent, RemoteParticipant, LocalVideoTrack, Track } from 'livekit-client';
 import ScreenShareModal from '../components/ScreenShareModal';
 import DrawingCanvas, { DrawingCanvasRef, DrawData } from '../components/DrawingCanvas';
+import ChatPanel from '../components/ChatPanel';
+import DrawingToolbar from '../components/DrawingToolbar';
 
 declare global {
   interface Window {
@@ -21,6 +23,10 @@ export default function RoomPage() {
 
   const [isDrawingMode, setIsDrawingMode] = useState(false);
   const [sources, setSources] = useState<any[]>([]);
+  
+  const [color, setColor] = useState('#ef4444');
+  const [size, setSize] = useState(4);
+  const [isEraser, setIsEraser] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const drawingCanvasRef = useRef<DrawingCanvasRef>(null);
@@ -158,9 +164,9 @@ export default function RoomPage() {
         )}
       </div>
 
-      <div className="absolute top-4 right-4 flex flex-col gap-2 pointer-events-auto z-50">
+      <div className={`absolute top-4 ${isConnected ? 'right-[340px]' : 'right-4'} flex flex-col gap-2 pointer-events-auto z-50 transition-all duration-300`}>
          <button 
-           className="p-3 bg-zinc-900/80 backdrop-blur-md rounded-full shadow-lg text-white hover:bg-indigo-600 transition-colors duration-200"
+           className="p-3 bg-zinc-900/80 backdrop-blur-md rounded-xl shadow-lg text-white hover:bg-indigo-600 transition-colors duration-200"
            onClick={handleShareScreen}
            title="화면 공유 버튼"
          >
@@ -168,7 +174,7 @@ export default function RoomPage() {
          </button>
          
          <button 
-           className={`p-3 rounded-full shadow-lg transition-colors duration-200 backdrop-blur-md ${isDrawingMode ? 'bg-indigo-500 text-white' : 'bg-zinc-900/80 text-gray-300 hover:text-white'}`}
+           className={`p-3 rounded-xl shadow-lg transition-colors duration-200 backdrop-blur-md ${isDrawingMode ? 'bg-indigo-500 text-white' : 'bg-zinc-900/80 text-gray-300 hover:text-white'}`}
            onClick={() => setIsDrawingMode(!isDrawingMode)}
            title="판서 모드 스위치"
          >
@@ -182,11 +188,35 @@ export default function RoomPage() {
         onCancel={() => setSources([])} 
       />
 
+      {isDrawingMode && (
+        <div className="absolute left-6 top-1/2 -translate-y-1/2 z-50 transition-opacity">
+          <DrawingToolbar 
+            color={color}
+            setColor={setColor}
+            size={size}
+            setSize={setSize}
+            isEraser={isEraser}
+            setIsEraser={setIsEraser}
+            onClear={() => {
+              drawingCanvasRef.current?.clearLocalCanvas();
+              broadcastDrawData({ type: 'clear', x: 0, y: 0, color, size, isEraser });
+            }}
+          />
+        </div>
+      )}
+      
       <DrawingCanvas 
         ref={drawingCanvasRef}
         isDrawingMode={isDrawingMode}
+        color={color}
+        size={size}
+        isEraser={isEraser}
         onDraw={broadcastDrawData}
       />
+
+      {isConnected && id && (
+        <ChatPanel channelId={id} />
+      )}
     </div>
   );
 }

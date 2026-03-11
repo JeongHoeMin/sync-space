@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
+import { UploadModule } from './upload/upload.module';
 import { AppGateway } from './gateway/app.gateway';
 import { ChannelController } from './channels/channel.controller';
 import { LivekitModule } from './livekit/livekit.module';
@@ -26,6 +27,7 @@ import { Message } from './entities/message.entity';
     TypeOrmModule.forFeature([User, Channel, ChannelParticipant, Message]),
     AuthModule,
     LivekitModule,
+    UploadModule,
   ],
   controllers: [AppController, ChannelController],
   providers: [AppService, AppGateway],

@@ -1,38 +1,61 @@
 import React, { useRef, useImperativeHandle, forwardRef } from 'react';
 
 export interface DrawData {
-  type: 'start' | 'draw' | 'end';
+  type: 'start' | 'draw' | 'end' | 'clear';
   x: number;
   y: number;
   color: string;
   size: number;
+  isEraser: boolean;
 }
 
 export interface DrawingCanvasProps {
   isDrawingMode: boolean;
+  color: string;
+  size: number;
+  isEraser: boolean;
   onDraw: (data: DrawData) => void;
 }
 
 export interface DrawingCanvasRef {
   drawFromRemote: (data: DrawData) => void;
+  clearLocalCanvas: () => void;
 }
 
-const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(({ isDrawingMode, onDraw }, ref) => {
+
+const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(({ isDrawingMode, color, size, isEraser, onDraw }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useImperativeHandle(ref, () => ({
     drawFromRemote: (data: DrawData) => {
-      const ctx = canvasRef.current?.getContext('2d');
-      if (!ctx) return;
+      const canvas = canvasRef.current;
+      const ctx = canvas?.getContext('2d');
+      if (!ctx || !canvas) return;
       
+      if (data.type === 'clear') {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        return;
+      }
+
+      ctx.globalCompositeOperation = data.isEraser ? 'destination-out' : 'source-over';
+      ctx.lineWidth = data.size;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
       if (data.type === 'start') {
         ctx.beginPath();
         ctx.moveTo(data.x, data.y);
       } else if (data.type === 'draw') {
         ctx.lineTo(data.x, data.y);
-        ctx.strokeStyle = data.color;
-        ctx.lineWidth = data.size;
+        if (!data.isEraser) ctx.strokeStyle = data.color;
         ctx.stroke();
+      }
+    },
+    clearLocalCanvas: () => {
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx?.clearRect(0, 0, canvas.width, canvas.height);
       }
     }
   }));
@@ -41,9 +64,12 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(({ isDraw
     if (!isDrawingMode) return;
     const ctx = canvasRef.current?.getContext('2d');
     if (ctx) {
+      ctx.globalCompositeOperation = isEraser ? 'destination-out' : 'source-over';
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
       ctx.beginPath();
       ctx.moveTo(e.clientX, e.clientY);
-      onDraw({ type: 'start', x: e.clientX, y: e.clientY, color: '#ef4444', size: 3 });
+      onDraw({ type: 'start', x: e.clientX, y: e.clientY, color, size, isEraser });
     }
   };
 
@@ -51,11 +77,12 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(({ isDraw
     if (e.buttons !== 1 || !isDrawingMode) return;
     const ctx = canvasRef.current?.getContext('2d');
     if (ctx) {
+      ctx.globalCompositeOperation = isEraser ? 'destination-out' : 'source-over';
       ctx.lineTo(e.clientX, e.clientY);
-      ctx.strokeStyle = '#ef4444';
-      ctx.lineWidth = 3;
+      if (!isEraser) ctx.strokeStyle = color;
+      ctx.lineWidth = size;
       ctx.stroke();
-      onDraw({ type: 'draw', x: e.clientX, y: e.clientY, color: '#ef4444', size: 3 });
+      onDraw({ type: 'draw', x: e.clientX, y: e.clientY, color, size, isEraser });
     }
   };
 
