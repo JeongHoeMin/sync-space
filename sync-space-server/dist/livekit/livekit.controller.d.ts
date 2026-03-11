@@ -1,8 +1,7 @@
-import { Repository } from 'typeorm';
-import { Channel } from '../entities/channel.entity';
+import { LivekitService } from './livekit.service';
 export declare class LiveKitController {
-    private channelRepo;
-    constructor(channelRepo: Repository<Channel>);
+    private readonly livekitService;
+    constructor(livekitService: LivekitService);
     getToken(req: any, channelId: string): Promise<{
         token: string;
     }>;

@@ -14,37 +14,15 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LiveKitController = void 0;
 const common_1 = require("@nestjs/common");
-const livekit_server_sdk_1 = require("livekit-server-sdk");
 const auth_guard_1 = require("../auth/auth.guard");
-const typeorm_1 = require("@nestjs/typeorm");
-const typeorm_2 = require("typeorm");
-const channel_entity_1 = require("../entities/channel.entity");
+const livekit_service_1 = require("./livekit.service");
 let LiveKitController = class LiveKitController {
-    constructor(channelRepo) {
-        this.channelRepo = channelRepo;
+    constructor(livekitService) {
+        this.livekitService = livekitService;
     }
     async getToken(req, channelId) {
-        if (!channelId) {
-            throw new common_1.HttpException('channelId is required', common_1.HttpStatus.BAD_REQUEST);
-        }
-        const channel = await this.channelRepo.findOne({ where: { id: channelId } });
-        if (!channel) {
-            throw new common_1.HttpException('Channel not found', common_1.HttpStatus.NOT_FOUND);
-        }
         const participantIdentity = req.user.email;
-        const roomName = channelId;
-        const apiKey = 'devkey';
-        const apiSecret = 'secret';
-        const at = new livekit_server_sdk_1.AccessToken(apiKey, apiSecret, {
-            identity: participantIdentity,
-        });
-        at.addGrant({
-            roomJoin: true,
-            room: roomName,
-            canPublish: true,
-            canSubscribe: true,
-        });
-        return { token: await at.toJwt() };
+        return this.livekitService.generateToken(channelId, participantIdentity);
     }
 };
 exports.LiveKitController = LiveKitController;
@@ -59,7 +37,6 @@ __decorate([
 exports.LiveKitController = LiveKitController = __decorate([
     (0, common_1.Controller)('livekit'),
     (0, common_1.UseGuards)(auth_guard_1.AuthGuard),
-    __param(0, (0, typeorm_1.InjectRepository)(channel_entity_1.Channel)),
-    __metadata("design:paramtypes", [typeorm_2.Repository])
+    __metadata("design:paramtypes", [livekit_service_1.LivekitService])
 ], LiveKitController);
 //# sourceMappingURL=livekit.controller.js.map

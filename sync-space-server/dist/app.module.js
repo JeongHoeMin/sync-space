@@ -14,7 +14,7 @@ const app_service_1 = require("./app.service");
 const auth_module_1 = require("./auth/auth.module");
 const app_gateway_1 = require("./gateway/app.gateway");
 const channel_controller_1 = require("./channels/channel.controller");
-const livekit_controller_1 = require("./livekit/livekit.controller");
+const livekit_module_1 = require("./livekit/livekit.module");
 const user_entity_1 = require("./entities/user.entity");
 const channel_entity_1 = require("./entities/channel.entity");
 const channel_participant_entity_1 = require("./entities/channel-participant.entity");
@@ -37,8 +37,9 @@ exports.AppModule = AppModule = __decorate([
             }),
             typeorm_1.TypeOrmModule.forFeature([user_entity_1.User, channel_entity_1.Channel, channel_participant_entity_1.ChannelParticipant, message_entity_1.Message]),
             auth_module_1.AuthModule,
+            livekit_module_1.LivekitModule,
         ],
-        controllers: [app_controller_1.AppController, channel_controller_1.ChannelController, livekit_controller_1.LiveKitController],
+        controllers: [app_controller_1.AppController, channel_controller_1.ChannelController],
         providers: [app_service_1.AppService, app_gateway_1.AppGateway],
     })
 ], AppModule);

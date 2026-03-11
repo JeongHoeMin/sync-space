@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { MonitorUp, PenTool, MousePointer2, LogOut } from 'lucide-react';
 import { Room, RoomEvent, RemoteParticipant, LocalVideoTrack, Track } from 'livekit-client';
+import ScreenShareModal from '../components/ScreenShareModal';
+import DrawingCanvas, { DrawingCanvasRef, DrawData } from '../components/DrawingCanvas';
 
 declare global {
   interface Window {
@@ -13,14 +15,6 @@ declare global {
   }
 }
 
-interface DrawData {
-  type: 'start' | 'draw' | 'end';
-  x: number;
-  y: number;
-  color: string;
-  size: number;
-}
-
 export default function RoomPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -29,7 +23,7 @@ export default function RoomPage() {
   const [sources, setSources] = useState<any[]>([]);
   
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const drawingCanvasRef = useRef<DrawingCanvasRef>(null);
   
   const [room, setRoom] = useState<Room | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -69,11 +63,11 @@ export default function RoomPage() {
         .on(RoomEvent.TrackUnsubscribed, (track: Track) => {
           setRemoteTracks(prev => prev.filter(t => t.sid !== track.sid));
         })
-        .on(RoomEvent.DataReceived, (payload: Uint8Array, participant?: RemoteParticipant) => {
+        .on(RoomEvent.DataReceived, (payload: Uint8Array) => {
           const decoder = new TextDecoder();
           try {
             const data: DrawData = JSON.parse(decoder.decode(payload));
-            drawFromRemote(data);
+            drawingCanvasRef.current?.drawFromRemote(data);
           } catch(e) {
           }
         });
@@ -111,42 +105,7 @@ export default function RoomPage() {
     }
   };
 
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawingMode) return;
-    const ctx = canvasRef.current?.getContext('2d');
-    if (ctx) {
-      ctx.beginPath();
-      ctx.moveTo(e.clientX, e.clientY);
-      broadcastDrawData({ type: 'start', x: e.clientX, y: e.clientY, color: '#ef4444', size: 3 });
-    }
-  };
 
-  const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (e.buttons !== 1 || !isDrawingMode) return;
-    const ctx = canvasRef.current?.getContext('2d');
-    if (ctx) {
-      ctx.lineTo(e.clientX, e.clientY);
-      ctx.strokeStyle = '#ef4444';
-      ctx.lineWidth = 3;
-      ctx.stroke();
-      broadcastDrawData({ type: 'draw', x: e.clientX, y: e.clientY, color: '#ef4444', size: 3 });
-    }
-  };
-
-  const drawFromRemote = (data: DrawData) => {
-    const ctx = canvasRef.current?.getContext('2d');
-    if (!ctx) return;
-    
-    if (data.type === 'start') {
-      ctx.beginPath();
-      ctx.moveTo(data.x, data.y);
-    } else if (data.type === 'draw') {
-      ctx.lineTo(data.x, data.y);
-      ctx.strokeStyle = data.color;
-      ctx.lineWidth = data.size;
-      ctx.stroke();
-    }
-  };
 
   const handleShareScreen = async () => {
     if (!window.electronAPI) return alert('데스크톱 앱 환경에서만 가능합니다.');
@@ -217,34 +176,16 @@ export default function RoomPage() {
          </button>
       </div>
 
-      {sources.length > 0 && (
-        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center pointer-events-auto">
-          <div className="bg-zinc-900 rounded-xl p-6 shadow-2xl max-w-2xl w-full">
-            <h2 className="text-xl font-bold text-white mb-4">공유할 화면 선택</h2>
-            <div className="grid grid-cols-3 gap-4 max-h-[60vh] overflow-y-auto">
-              {sources.map(src => (
-                <div 
-                  key={src.id} 
-                  className="bg-zinc-800 rounded-lg p-2 cursor-pointer hover:ring-2 ring-indigo-500 transition-all flex flex-col"
-                  onClick={() => selectSource(src.id)}
-                >
-                  <img src={src.thumbnail.toDataURL()} alt={src.name} className="w-full h-32 object-contain bg-black/30 rounded mb-2" />
-                  <p className="text-sm text-gray-300 truncate text-center">{src.name}</p>
-                </div>
-              ))}
-            </div>
-            <button className="mt-6 px-4 py-2 bg-zinc-700 text-white rounded hover:bg-zinc-600 w-full" onClick={() => setSources([])}>취소</button>
-          </div>
-        </div>
-      )}
+      <ScreenShareModal 
+        sources={sources} 
+        onSelect={selectSource} 
+        onCancel={() => setSources([])} 
+      />
 
-      <canvas 
-        ref={canvasRef}
-        width={window.innerWidth}
-        height={window.innerHeight}
-        className={`absolute inset-0 w-full h-full z-40 transition-colors duration-200 ${isDrawingMode ? 'pointer-events-auto cursor-crosshair bg-black/5' : 'pointer-events-none'}`}
-        onMouseDown={startDrawing}
-        onMouseMove={draw}
+      <DrawingCanvas 
+        ref={drawingCanvasRef}
+        isDrawingMode={isDrawingMode}
+        onDraw={broadcastDrawData}
       />
     </div>
   );

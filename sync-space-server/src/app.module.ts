@@ -5,7 +5,7 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { AppGateway } from './gateway/app.gateway';
 import { ChannelController } from './channels/channel.controller';
-import { LiveKitController } from './livekit/livekit.controller';
+import { LivekitModule } from './livekit/livekit.module';
 import { User } from './entities/user.entity';
 import { Channel } from './entities/channel.entity';
 import { ChannelParticipant } from './entities/channel-participant.entity';
@@ -25,8 +25,9 @@ import { Message } from './entities/message.entity';
     }),
     TypeOrmModule.forFeature([User, Channel, ChannelParticipant, Message]),
     AuthModule,
+    LivekitModule,
   ],
-  controllers: [AppController, ChannelController, LiveKitController],
+  controllers: [AppController, ChannelController],
   providers: [AppService, AppGateway],
 })
 export class AppModule {}
