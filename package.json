@@ -1,0 +1,8 @@
+{
+  "name": "sync-space-setup",
+  "version": "1.0.0",
+  "scripts": {
+    "setup:app": "npm create vite@latest sync-space-app -- --template react-ts",
+    "setup:server": "npx -y @nestjs/cli new sync-space-server --package-manager npm --strict --skip-git"
+  }
+}

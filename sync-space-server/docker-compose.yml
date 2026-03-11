@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    container_name: sync-space-db
+    environment:
+      POSTGRES_USER: syncspace
+      POSTGRES_PASSWORD: syncspace_password
+      POSTGRES_DB: syncspace_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: sync-space-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: sync-space-livekit
+    command: --dev --config /etc/livekit.yaml
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+    environment:
+      - LIVEKIT_KEYS=devkey:secret
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
