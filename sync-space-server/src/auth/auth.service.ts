@@ -5,6 +5,7 @@ import { User } from '../entities/user.entity';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { RegisterDto, LoginDto } from './dto/auth.dto';
+import { SessionService } from '../gateway/session.service';
 
 @Injectable()
 export class AuthService {
@@ -12,6 +13,7 @@ export class AuthService {
     @InjectRepository(User)
     private userRepository: Repository<User>,
     private jwtService: JwtService,
+    private sessionService: SessionService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -46,6 +48,12 @@ export class AuthService {
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
+
+    // [중복 로그인 방지] 신규 토큰 발급 전 기존 세션의 모든 소켓에 force_logout 발송
+    this.sessionService.kickAllSockets(
+      dto.email,
+      '다른 기기에서 로그인되어 자동 로그아웃됩니다.',
+    );
 
     const payload = { sub: user.id, email: user.email };
     return {

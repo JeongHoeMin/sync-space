@@ -4,9 +4,9 @@ export declare class UploadController {
     constructor(uploadService: UploadService);
     uploadFile(file: Express.Multer.File): {
         url: string;
-        filename: any;
-        originalname: any;
-        mimetype: any;
-        size: any;
+        filename: string;
+        originalname: string;
+        mimetype: string;
+        size: number;
     };
 }

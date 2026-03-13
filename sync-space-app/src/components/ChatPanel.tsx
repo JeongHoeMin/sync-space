@@ -31,12 +31,13 @@ export default function ChatPanel({ channelId }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const observerTarget = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    const newSocket = io('http://localhost:3000', {
+    const newSocket = io(API_URL, {
       auth: { token },
     });
 
@@ -80,7 +81,7 @@ export default function ChatPanel({ channelId }: ChatPanelProps) {
     const token = localStorage.getItem('token');
     
     try {
-      const res = await fetch(`http://localhost:3000/channels/${channelId}/messages?cursor=${cursor}&limit=30`, {
+      const res = await fetch(`${API_URL}/channels/${channelId}/messages?cursor=${cursor}&limit=30`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -222,7 +223,7 @@ export default function ChatPanel({ channelId }: ChatPanelProps) {
     const token = localStorage.getItem('token');
     
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', 'http://localhost:3000/upload', true);
+    xhr.open('POST', `${API_URL}/upload`, true);
     if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
 
     xhr.upload.onprogress = (event) => {
@@ -311,7 +312,7 @@ export default function ChatPanel({ channelId }: ChatPanelProps) {
 
   return (
     <div 
-      className="flex flex-col h-screen bg-zinc-900 border-l border-zinc-800 w-80 shadow-2xl z-[60] pointer-events-auto absolute right-0 top-0"
+      className="flex flex-col h-full bg-zinc-900 border-l border-zinc-800 w-80 shadow-2xl z-[60] pointer-events-auto absolute right-0 bottom-0"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}

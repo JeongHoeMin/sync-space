@@ -1,4 +1,3 @@
-import React from 'react';
 
 export interface ScreenShareModalProps {
   sources: any[];
@@ -20,7 +19,7 @@ export default function ScreenShareModal({ sources, onSelect, onCancel }: Screen
               className="bg-zinc-800 rounded-lg p-2 cursor-pointer hover:ring-2 ring-indigo-500 transition-all flex flex-col"
               onClick={() => onSelect(src.id)}
             >
-              <img src={src.thumbnail.toDataURL()} alt={src.name} className="w-full h-32 object-contain bg-black/30 rounded mb-2" />
+              <img src={src.thumbnail} alt={src.name} className="w-full h-32 object-contain bg-black/30 rounded mb-2" />
               <p className="text-sm text-gray-300 truncate text-center">{src.name}</p>
             </div>
           ))}

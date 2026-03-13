@@ -4,6 +4,7 @@ import { User } from '../entities/user.entity';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtModule } from '@nestjs/jwt';
+import { SessionModule } from '../gateway/session.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { JwtModule } from '@nestjs/jwt';
       secret: 'super_secret_dev_key', // TODO: 환경변수로 분리
       signOptions: { expiresIn: '1d' },
     }),
+    SessionModule,
   ],
   providers: [AuthService],
   controllers: [AuthController],

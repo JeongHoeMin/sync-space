@@ -22,11 +22,17 @@ let LiveKitController = class LiveKitController {
     }
     async getToken(req, channelId) {
         const participantIdentity = req.user.email;
-        return this.livekitService.generateToken(channelId, participantIdentity);
+        const userId = req.user.sub;
+        return this.livekitService.generateToken(channelId, participantIdentity, userId);
+    }
+    async handleWebhook(req, authHeader) {
+        const bodyString = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+        return this.livekitService.processWebhook(bodyString, authHeader);
     }
 };
 exports.LiveKitController = LiveKitController;
 __decorate([
+    (0, common_1.UseGuards)(auth_guard_1.AuthGuard),
     (0, common_1.Post)('token'),
     __param(0, (0, common_1.Request)()),
     __param(1, (0, common_1.Body)('channelId')),
@@ -34,6 +40,14 @@ __decorate([
     __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", Promise)
 ], LiveKitController.prototype, "getToken", null);
+__decorate([
+    (0, common_1.Post)('webhook'),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Headers)('Authorization')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", Promise)
+], LiveKitController.prototype, "handleWebhook", null);
 exports.LiveKitController = LiveKitController = __decorate([
     (0, common_1.Controller)('livekit'),
     (0, common_1.UseGuards)(auth_guard_1.AuthGuard),

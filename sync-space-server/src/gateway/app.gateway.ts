@@ -4,6 +4,7 @@ import {
   SubscribeMessage,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  OnGatewayInit,
   ConnectedSocket,
   MessageBody,
 } from '@nestjs/websockets';
@@ -15,23 +16,31 @@ import { Channel } from '../entities/channel.entity';
 import { ChannelParticipant } from '../entities/channel-participant.entity';
 import { Message, MessageType } from '../entities/message.entity';
 import { User } from '../entities/user.entity';
+import { SessionService } from './session.service';
 
 @WebSocketGateway({
   cors: {
     origin: '*',
   },
 })
-export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class AppGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
   constructor(
     private jwtService: JwtService,
+    private sessionService: SessionService,
     @InjectRepository(Channel) private channelRepo: Repository<Channel>,
     @InjectRepository(ChannelParticipant) private participantRepo: Repository<ChannelParticipant>,
     @InjectRepository(Message) private messageRepo: Repository<Message>,
     @InjectRepository(User) private userRepo: Repository<User>,
   ) {}
+
+  /** Socket.IO Server 초기화 완료 시 SessionService에 레퍼런스 전달 */
+  afterInit(server: Server) {
+    this.sessionService.setServer(server);
+    console.log('[AppGateway] Server initialized');
+  }
 
   async handleConnection(client: Socket) {
     try {
@@ -40,6 +49,9 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
       
       const payload = this.jwtService.verify(token, { secret: 'super_secret_dev_key' });
       client.data.user = payload; // { sub: id, email }
+
+      // 소켓 등록 (kick은 하지 않음 - 사용자당 소켓 여러 개 가능)
+      this.sessionService.registerSocket(payload.email, client.id);
       console.log(`Client connected: ${client.id} (User: ${payload.email})`);
     } catch (e) {
       console.error('Socket connection error:', e.message);
@@ -53,8 +65,12 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const user = client.data.user;
     const channelId = client.data.channelId;
 
+    // 세션 맵에서 제거
+    if (user?.email) {
+      this.sessionService.removeSocket(user.email, client.id);
+    }
+
     if (user && channelId) {
-      // 남아있는 유저들에게 브로드캐스팅
       this.server.to(channelId).emit('user_disconnected', { userId: user.sub, email: user.email });
       console.log(`User ${user.email} disconnected from channel ${channelId}`);
 
@@ -77,35 +93,29 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const userId = client.data.user.sub;
     const channelId = data.channelId;
     
-    // 연결이 끊어졌을 때를 대비해 소켓에 채널 ID 저장
     client.data.channelId = channelId;
     
-    // 1. 채널 존재 여부 확인
     const channel = await this.channelRepo.findOne({ where: { id: channelId } });
     if (!channel) return { error: 'Channel not found' };
 
     const user = await this.userRepo.findOne({ where: { id: userId } });
 
-    // 2. 참여자 저장 (중복 체크 생략)
     const existing = await this.participantRepo.findOne({ where: { channel: { id: channelId }, user: { id: userId } } });
     if (!existing) {
       const participant = this.participantRepo.create({ channel, user });
       await this.participantRepo.save(participant);
     }
 
-    // 3. 소켓 룸 입장
     client.join(channelId);
     console.log(`User ${userId} joined channel ${channelId}`);
 
-    // 4. 기존 사용자들에게 입장 알림
     this.server.to(channelId).emit('user_joined', { userId, email: client.data.user.email });
 
-    // 5. 과거 메시지 전송 (최대 50개)
     const messages = await this.messageRepo.find({
       where: { channel: { id: channelId } },
       relations: ['sender'],
       order: { created_at: 'ASC' },
-      take: 50, // 필요시 페이징 구현
+      take: 50,
     });
 
     const historyMessages = messages.map(msg => ({
@@ -147,7 +157,7 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
       content: savedMessage.content,
       type: savedMessage.message_type,
       created_at: savedMessage.created_at,
-      tempId: data.tempId, // 낙관적 UI 연동을 위한 임시 ID 반환
+      tempId: data.tempId,
     });
   }
 }

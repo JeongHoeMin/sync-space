@@ -1,5 +1,9 @@
 import { app, BrowserWindow, ipcMain, desktopCapturer } from 'electron';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // The built directory structure
 //
@@ -18,13 +22,11 @@ const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL'];
 
 function createWindow() {
   win = new BrowserWindow({
-    icon: path.join(process.env.VITE_PUBLIC, 'electron-vite.svg'),
-    width: 800,
-    height: 600,
-    transparent: true,      // 투명 윈도우 지원
-    frame: false,           // 윈도우 프레임 제거
-    hasShadow: false,       // 그림자 제거 (깔끔한 투명 처리용)
-    alwaysOnTop: true,      // 오버레이 목적으로 항상 위
+    icon: path.join(process.env.VITE_PUBLIC || '', 'electron-vite.svg'),
+    width: 900,
+    height: 700,
+    transparent: false,
+    frame: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -32,19 +34,36 @@ function createWindow() {
     },
   });
 
-  // 클릭 이벤트 통과 설정. (평소에는 통과, 특정 상황에서는 통과 해제)
-  win.setIgnoreMouseEvents(true, { forward: true });
+  // 기본적인 메뉴 제거
+  win.setMenu(null);
 
   win.webContents.on('did-finish-load', () => {
-    win?.webContents.send('main-process-message', (new Date).toLocaleString());
+    console.log('Main window finished loading');
+    win?.show();
+    win?.focus();
+  });
+
+  win.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+    console.error(`Failed to load URL: ${validatedURL} with error: ${errorDescription} (${errorCode})`);
+  });
+
+  // 렌더러 로그를 메인 터미널로 전달
+  win.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    const levels = ['DEBUG', 'INFO', 'WARN', 'ERROR'];
+    console.log(`[RENDERER-${levels[level] || 'LOG'}] ${message} (${sourceId}:${line})`);
   });
 
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL);
   } else {
-    // win.loadFile('dist/index.html')
-    win.loadFile(path.join(process.env.DIST, 'index.html'));
+    const indexPath = path.join(process.env.DIST || '', 'index.html');
+    console.log(`Loading production index from: ${indexPath}`);
+    win.loadFile(indexPath).catch(err => {
+      console.error('Failed to load file:', err);
+    });
   }
+
+  // win.webContents.openDevTools(); // 확실하게 확인하기 위해 다시 켬
 }
 
 // 렌더러 프로세스로부터 클릭 스루 상태를 제어받기 위한 IPC 통신
@@ -61,7 +80,7 @@ ipcMain.handle('get-desktop-sources', async () => {
   return sources.map(src => ({
     id: src.id,
     name: src.name,
-    thumbnail: { toDataURL: () => src.thumbnail.toDataURL() },
+    thumbnail: src.thumbnail.toDataURL(), // Send direct DataURL string
   }));
 });
 

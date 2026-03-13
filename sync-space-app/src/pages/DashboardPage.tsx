@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogOut, Plus, Video } from 'lucide-react';
+import { useForceLogout } from '../hooks/useForceLogout';
 
 interface Channel {
   id: string;
@@ -11,13 +12,16 @@ export default function DashboardPage() {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [newTitle, setNewTitle] = useState('');
   const navigate = useNavigate();
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+  useForceLogout(); // 중복 로그인 시 강제 로그아웃
 
   const fetchChannels = async () => {
     const token = localStorage.getItem('token');
     if (!token) return navigate('/');
 
     try {
-      const res = await fetch('http://localhost:3000/channels', {
+      const res = await fetch(`${API_URL}/channels`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.status === 401) throw new Error('Unauthorized');
@@ -38,7 +42,7 @@ export default function DashboardPage() {
     if (!newTitle.trim()) return;
 
     try {
-      await fetch('http://localhost:3000/channels', {
+      await fetch(`${API_URL}/channels`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -59,8 +63,11 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="w-screen h-screen bg-zinc-950 text-white p-8 overflow-y-auto">
-      <div className="max-w-4xl mx-auto">
+    <div 
+      className="w-screen h-screen bg-zinc-950 text-white p-8 overflow-y-auto pointer-events-auto"
+      style={{ WebkitAppRegion: 'drag' } as any}
+    >
+      <div className="max-w-4xl mx-auto" style={{ WebkitAppRegion: 'no-drag' } as any}>
         <div className="flex justify-between items-center mb-10 pb-4 border-b border-zinc-800">
           <h1 className="text-3xl font-bold tracking-tight">대시보드</h1>
           <button onClick={logout} className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors">

@@ -5,4 +5,7 @@ export declare class LiveKitController {
     getToken(req: any, channelId: string): Promise<{
         token: string;
     }>;
+    handleWebhook(req: any, authHeader: string): Promise<{
+        success: boolean;
+    }>;
 }

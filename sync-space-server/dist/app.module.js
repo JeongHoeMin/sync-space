@@ -28,11 +28,11 @@ exports.AppModule = AppModule = __decorate([
         imports: [
             typeorm_1.TypeOrmModule.forRoot({
                 type: 'postgres',
-                host: 'localhost',
-                port: 5432,
-                username: 'syncspace',
-                password: 'syncspace_password',
-                database: 'syncspace_dev',
+                host: process.env.DB_HOST || 'localhost',
+                port: parseInt(process.env.DB_PORT || '5432'),
+                username: process.env.DB_USER || 'syncspace',
+                password: process.env.DB_PASS || 'syncspace_password',
+                database: process.env.DB_NAME || 'syncspace_dev',
                 entities: [user_entity_1.User, channel_entity_1.Channel, channel_participant_entity_1.ChannelParticipant, message_entity_1.Message],
                 synchronize: true,
             }),

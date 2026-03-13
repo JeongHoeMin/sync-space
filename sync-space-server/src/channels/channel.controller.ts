@@ -5,6 +5,7 @@ import { Channel } from '../entities/channel.entity';
 import { AuthGuard } from '../auth/auth.guard';
 import { User } from '../entities/user.entity';
 import { Message } from '../entities/message.entity';
+import { Drawing } from '../entities/drawing.entity';
 
 @Controller('channels')
 @UseGuards(AuthGuard)
@@ -13,6 +14,7 @@ export class ChannelController {
     @InjectRepository(Channel) private channelRepo: Repository<Channel>,
     @InjectRepository(User) private userRepo: Repository<User>,
     @InjectRepository(Message) private messageRepo: Repository<Message>,
+    @InjectRepository(Drawing) private drawingRepo: Repository<Drawing>,
   ) {}
 
   @Post()
@@ -100,5 +102,23 @@ export class ChannelController {
       nextCursor,
       hasNextPage,
     };
+  }
+
+  @Get(':id/drawings')
+  async getDrawings(@Param('id') channelId: string) {
+    const drawing = await this.drawingRepo.findOne({ where: { channel_id: channelId } });
+    return drawing ? drawing.history : [];
+  }
+
+  @Post(':id/drawings')
+  async updateDrawings(@Param('id') channelId: string, @Body('history') history: any[]) {
+    let drawing = await this.drawingRepo.findOne({ where: { channel_id: channelId } });
+    if (!drawing) {
+      drawing = this.drawingRepo.create({ channel_id: channelId, history });
+    } else {
+      drawing.history = history;
+    }
+    await this.drawingRepo.save(drawing);
+    return { success: true };
   }
 }

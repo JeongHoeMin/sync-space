@@ -1,0 +1,13 @@
+port: 7880
+bind_addresses:
+  - 0.0.0.0
+rtc:
+  tcp_port: 7881
+  udp_port: 7882
+  use_external_ip: true
+  # 외부(LAN)에서 접속 시 호스트 PC의 IP를 아래에 적어주세요.
+  # node_ip: 19.19.20.49
+keys:
+  devkey: secret
+logging:
+  level: debug

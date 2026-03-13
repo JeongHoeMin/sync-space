@@ -10,3 +10,12 @@ html, body, #root {
   background-color: transparent !important;
   overflow: hidden;
 }
+
+/* Electron Click-through helper classes */
+.pointer-events-auto {
+  pointer-events: auto !important;
+}
+
+button, input, select, textarea, a {
+  pointer-events: auto !important;
+}

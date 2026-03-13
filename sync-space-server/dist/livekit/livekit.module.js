@@ -12,12 +12,14 @@ const typeorm_1 = require("@nestjs/typeorm");
 const livekit_controller_1 = require("./livekit.controller");
 const livekit_service_1 = require("./livekit.service");
 const channel_entity_1 = require("../entities/channel.entity");
+const channel_participant_entity_1 = require("../entities/channel-participant.entity");
+const user_entity_1 = require("../entities/user.entity");
 let LivekitModule = class LivekitModule {
 };
 exports.LivekitModule = LivekitModule;
 exports.LivekitModule = LivekitModule = __decorate([
     (0, common_1.Module)({
-        imports: [typeorm_1.TypeOrmModule.forFeature([channel_entity_1.Channel])],
+        imports: [typeorm_1.TypeOrmModule.forFeature([channel_entity_1.Channel, channel_participant_entity_1.ChannelParticipant, user_entity_1.User])],
         controllers: [livekit_controller_1.LiveKitController],
         providers: [livekit_service_1.LivekitService],
     })

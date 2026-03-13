@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: sync-space-db
+    environment:
+      POSTGRES_USER: syncspace
+      POSTGRES_PASSWORD: syncspace_password
+      POSTGRES_DB: syncspace_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: sync-space-redis
+    ports:
+      - "6379:6379"
+
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: sync-space-livekit
+    command: --config /etc/livekit.yaml
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml
+    ports:
+      - "7885:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+
+  backend:
+    build:
+      context: ./sync-space-server
+    container_name: sync-space-backend
+    environment:
+      PORT: 3000
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: syncspace
+      DB_PASS: syncspace_password
+      DB_NAME: syncspace_dev
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: super_secret_dev_key
+      LIVEKIT_API_KEY: devkey
+      LIVEKIT_API_SECRET: secret
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+      - redis
+      - livekit
+
+volumes:
+  postgres_data:

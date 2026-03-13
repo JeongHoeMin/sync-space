@@ -5,29 +5,32 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { UploadModule } from './upload/upload.module';
 import { AppGateway } from './gateway/app.gateway';
+import { SessionModule } from './gateway/session.module';
 import { ChannelController } from './channels/channel.controller';
 import { LivekitModule } from './livekit/livekit.module';
 import { User } from './entities/user.entity';
 import { Channel } from './entities/channel.entity';
 import { ChannelParticipant } from './entities/channel-participant.entity';
 import { Message } from './entities/message.entity';
+import { Drawing } from './entities/drawing.entity';
 
 @Module({
   imports: [
     TypeOrmModule.forRoot({
       type: 'postgres',
-      host: 'localhost',
-      port: 5432,
-      username: 'syncspace',
-      password: 'syncspace_password',
-      database: 'syncspace_dev',
-      entities: [User, Channel, ChannelParticipant, Message],
-      synchronize: true, // 개발 중 자동 스키마 동기화 (프로덕션에서는 막아야 함)
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT || '5432'),
+      username: process.env.DB_USER || 'syncspace',
+      password: process.env.DB_PASS || 'syncspace_password',
+      database: process.env.DB_NAME || 'syncspace_dev',
+      entities: [User, Channel, ChannelParticipant, Message, Drawing],
+      synchronize: true,
     }),
-    TypeOrmModule.forFeature([User, Channel, ChannelParticipant, Message]),
+    TypeOrmModule.forFeature([User, Channel, ChannelParticipant, Message, Drawing]),
     AuthModule,
     LivekitModule,
     UploadModule,
+    SessionModule,
   ],
   controllers: [AppController, ChannelController],
   providers: [AppService, AppGateway],
