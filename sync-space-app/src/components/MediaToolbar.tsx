@@ -12,11 +12,13 @@ interface MediaToolbarProps {
   onLeaveRoom: () => void;
   isGridVisible: boolean;
   onToggleGrid: () => void;
+  isSpeaking?: boolean;
 }
 
 export default function MediaToolbar({
   room, isConnected, isDrawingMode, onToggleDrawingMode,
   isScreenSharing, onToggleShareScreen, onLeaveRoom, isGridVisible, onToggleGrid,
+  isSpeaking = false,
 }: MediaToolbarProps) {
   const [isMicEnabled, setIsMicEnabled] = useState(false);
   const [isVideoEnabled, setIsVideoEnabled] = useState(false);
@@ -76,7 +78,11 @@ export default function MediaToolbar({
               </button>
 
               <button
-                className={`p-3 rounded-xl transition-all duration-200 ${isMicEnabled ? 'bg-zinc-800 text-white hover:bg-zinc-700' : 'bg-red-500/20 text-red-500 hover:bg-red-500/30'}`}
+                className={`p-3 rounded-xl transition-all duration-200 ${
+                  !isMicEnabled ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30' : 
+                  isSpeaking ? 'bg-green-500/20 text-green-500 hover:bg-green-500/30 shadow-[0_0_15px_rgba(34,197,94,0.3)]' : 
+                  'bg-zinc-800 text-white hover:bg-zinc-700'
+                }`}
                 onClick={toggleMic}
                 title="마이크 켜기/끄기"
               >

@@ -1,72 +1,56 @@
-import { app, ipcMain, BrowserWindow, desktopCapturer } from "electron";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-const __filename$1 = fileURLToPath(import.meta.url);
-const __dirname$1 = path.dirname(__filename$1);
-process.env.DIST = path.join(__dirname$1, "../dist");
-process.env.VITE_PUBLIC = app.isPackaged ? process.env.DIST : path.join(process.env.DIST, "../public");
-let win;
-const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
-function createWindow() {
-  win = new BrowserWindow({
-    icon: path.join(process.env.VITE_PUBLIC || "", "electron-vite.svg"),
+import { app as r, ipcMain as p, BrowserWindow as a, desktopCapturer as m } from "electron";
+import s from "node:path";
+import { fileURLToPath as w } from "node:url";
+const h = w(import.meta.url), f = s.dirname(h);
+process.env.DIST = s.join(f, "../dist");
+process.env.VITE_PUBLIC = r.isPackaged ? process.env.DIST : s.join(process.env.DIST, "../public");
+let e;
+const d = process.env.VITE_DEV_SERVER_URL;
+function u() {
+  if (e = new a({
+    icon: s.join(process.env.VITE_PUBLIC || "", "electron-vite.svg"),
     width: 900,
     height: 700,
-    transparent: false,
-    frame: true,
+    transparent: !1,
+    frame: !0,
     webPreferences: {
-      preload: path.join(__dirname$1, "preload.js"),
-      nodeIntegration: false,
-      contextIsolation: true
+      preload: s.join(f, "preload.js"),
+      nodeIntegration: !1,
+      contextIsolation: !0
     }
-  });
-  win.setMenu(null);
-  win.webContents.on("did-finish-load", () => {
-    console.log("Main window finished loading");
-    win == null ? void 0 : win.show();
-    win == null ? void 0 : win.focus();
-  });
-  win.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
-    console.error(`Failed to load URL: ${validatedURL} with error: ${errorDescription} (${errorCode})`);
-  });
-  win.webContents.on("console-message", (_event, level, message, line, sourceId) => {
-    const levels = ["DEBUG", "INFO", "WARN", "ERROR"];
-    console.log(`[RENDERER-${levels[level] || "LOG"}] ${message} (${sourceId}:${line})`);
-  });
-  if (VITE_DEV_SERVER_URL) {
-    win.loadURL(VITE_DEV_SERVER_URL);
-  } else {
-    const indexPath = path.join(process.env.DIST || "", "index.html");
-    console.log(`Loading production index from: ${indexPath}`);
-    win.loadFile(indexPath).catch((err) => {
-      console.error("Failed to load file:", err);
+  }), e.setMenu(null), e.webContents.on("did-finish-load", () => {
+    console.log("Main window finished loading"), e == null || e.show(), e == null || e.focus();
+  }), e.webContents.on("did-fail-load", (n, o, t, i) => {
+    console.error(`Failed to load URL: ${i} with error: ${t} (${o})`);
+  }), e.webContents.on("console-message", (n, o, t, i, l) => {
+    console.log(`[RENDERER-${["DEBUG", "INFO", "WARN", "ERROR"][o] || "LOG"}] ${t} (${l}:${i})`);
+  }), d)
+    e.loadURL(d);
+  else {
+    const n = s.join(process.env.DIST || "", "index.html");
+    console.log(`Loading production index from: ${n}`), e.loadFile(n).catch((o) => {
+      console.error("Failed to load file:", o);
     });
   }
+  e.webContents.openDevTools();
 }
-ipcMain.on("set-ignore-mouse-events", (event, ignore) => {
-  const win2 = BrowserWindow.fromWebContents(event.sender);
-  if (win2) {
-    win2.setIgnoreMouseEvents(ignore, { forward: true });
-  }
+p.on("set-ignore-mouse-events", (n, o) => {
+  const t = a.fromWebContents(n.sender);
+  t && t.setIgnoreMouseEvents(o, { forward: !0 });
 });
-ipcMain.handle("get-desktop-sources", async () => {
-  const sources = await desktopCapturer.getSources({ types: ["window", "screen"], thumbnailSize: { width: 300, height: 300 } });
-  return sources.map((src) => ({
-    id: src.id,
-    name: src.name,
-    thumbnail: src.thumbnail.toDataURL()
-    // Send direct DataURL string
-  }));
+p.handle("get-desktop-sources", async () => (await m.getSources({ types: ["window", "screen"], thumbnailSize: { width: 300, height: 300 } })).map((o) => ({
+  id: o.id,
+  name: o.name,
+  thumbnail: o.thumbnail.toDataURL()
+  // Send direct DataURL string
+})));
+r.on("window-all-closed", () => {
+  process.platform !== "darwin" && (r.quit(), e = null);
 });
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-    win = null;
-  }
+r.on("activate", () => {
+  a.getAllWindows().length === 0 && u();
 });
-app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
-  }
+r.on("certificate-error", (n, o, t, i, l, c) => {
+  n.preventDefault(), c(!0);
 });
-app.whenReady().then(createWindow);
+r.whenReady().then(u);

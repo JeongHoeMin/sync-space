@@ -84,8 +84,8 @@ function ParticipantVideo({
 
   return (
     <div
-      className={`relative bg-zinc-800 rounded-xl overflow-hidden aspect-video shadow-lg transition-all duration-200 w-28 md:w-36 border-2 cursor-pointer hover:brightness-110 hover:border-indigo-400 ${
-        isSpeaking ? 'border-indigo-500 scale-105' : 'border-zinc-700'
+      className={`relative bg-zinc-800 rounded-xl overflow-hidden aspect-video shadow-lg transition-all duration-200 w-28 md:w-36 border-2 cursor-pointer hover:brightness-110 hover:border-green-400 ${
+        isSpeaking ? 'border-green-500 scale-105 shadow-[0_0_15px_rgba(34,197,94,0.3)]' : 'border-zinc-700'
       }`}
       onClick={onClick}
       title="클릭하여 크게 보기"

@@ -32,7 +32,9 @@ async function bootstrap() {
     transform: true,
   }));
 
-  await app.listen(3000);
-  console.log(`SyncSpace Server is running on: http://localhost:3000`);
+  const port = process.env.PORT || 3000;
+  await app.listen(port);
+  console.log(`SyncSpace Server (HTTP) is running on: http://localhost:${port}`);
+  console.log('🔒 SSL is expected to be handled by a reverse proxy (Caddy/Nginx)');
 }
 bootstrap();

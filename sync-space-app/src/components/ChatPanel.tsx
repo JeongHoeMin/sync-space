@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { Paperclip, Send } from 'lucide-react';
+import { configService } from '../services/config.service';
 
 interface ChatMessage {
   id: string;
@@ -31,13 +32,12 @@ export default function ChatPanel({ channelId }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const observerTarget = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    const newSocket = io(API_URL, {
+    const newSocket = io(configService.getApiUrl(), {
       auth: { token },
     });
 
@@ -81,7 +81,7 @@ export default function ChatPanel({ channelId }: ChatPanelProps) {
     const token = localStorage.getItem('token');
     
     try {
-      const res = await fetch(`${API_URL}/channels/${channelId}/messages?cursor=${cursor}&limit=30`, {
+      const res = await fetch(`${configService.getApiUrl()}/channels/${channelId}/messages?cursor=${cursor}&limit=30`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -223,7 +223,7 @@ export default function ChatPanel({ channelId }: ChatPanelProps) {
     const token = localStorage.getItem('token');
     
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', `${API_URL}/upload`, true);
+    xhr.open('POST', `${configService.getApiUrl()}/upload`, true);
     if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
 
     xhr.upload.onprogress = (event) => {

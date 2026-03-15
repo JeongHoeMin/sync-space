@@ -1,8 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+import { configService } from '../services/config.service';
 
 /**
  * 서버로부터 force_logout 이벤트를 수신하면 자동으로 로그아웃 처리하는 훅
@@ -16,7 +15,7 @@ export function useForceLogout() {
     if (!token) return;
 
     // 강제 로그아웃 감지 전용 소켓 (ChatPanel과 별개)
-    const socket = io(API_URL, {
+    const socket = io(configService.getApiUrl(), {
       auth: { token },
       reconnection: false, // 강제 해제 후 재연결 시도 방지
     });

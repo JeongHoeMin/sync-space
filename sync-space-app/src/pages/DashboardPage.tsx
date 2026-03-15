@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogOut, Plus, Video } from 'lucide-react';
 import { useForceLogout } from '../hooks/useForceLogout';
+import { configService } from '../services/config.service';
 
 interface Channel {
   id: string;
@@ -12,7 +13,6 @@ export default function DashboardPage() {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [newTitle, setNewTitle] = useState('');
   const navigate = useNavigate();
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
   useForceLogout(); // 중복 로그인 시 강제 로그아웃
 
@@ -21,7 +21,7 @@ export default function DashboardPage() {
     if (!token) return navigate('/');
 
     try {
-      const res = await fetch(`${API_URL}/channels`, {
+      const res = await fetch(`${configService.getApiUrl()}/channels`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.status === 401) throw new Error('Unauthorized');
@@ -42,7 +42,7 @@ export default function DashboardPage() {
     if (!newTitle.trim()) return;
 
     try {
-      await fetch(`${API_URL}/channels`, {
+      await fetch(`${configService.getApiUrl()}/channels`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

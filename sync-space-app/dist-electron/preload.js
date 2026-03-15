@@ -1,6 +1,6 @@
-const { contextBridge, ipcRenderer } = require("electron");
-contextBridge.exposeInMainWorld("electronAPI", {
-  setIgnoreMouseEvents: (ignore) => ipcRenderer.send("set-ignore-mouse-events", ignore),
-  getDesktopSources: () => ipcRenderer.invoke("get-desktop-sources"),
-  onMessage: (callback) => ipcRenderer.on("main-process-message", (_event, value) => callback(value))
+const { contextBridge: n, ipcRenderer: s } = require("electron");
+n.exposeInMainWorld("electronAPI", {
+  setIgnoreMouseEvents: (e) => s.send("set-ignore-mouse-events", e),
+  getDesktopSources: () => s.invoke("get-desktop-sources"),
+  onMessage: (e) => s.on("main-process-message", (t, o) => e(o))
 });

@@ -9,6 +9,7 @@ import DrawingToolbar from '../components/DrawingToolbar';
 import MediaToolbar from '../components/MediaToolbar';
 import VideoGrid from '../components/VideoGrid';
 import { useForceLogout } from '../hooks/useForceLogout';
+import { configService } from '../services/config.service';
 
 declare global {
   interface Window {
@@ -54,6 +55,9 @@ export default function RoomPage() {
   // 로컬 미디어 상태 (StatusOverlay 동기화용)
   const [, setLocalMediaUpdate] = useState(0);
 
+  // 로컬 참가자 발화 상태
+  const [isLocalSpeaking, setIsLocalSpeaking] = useState(false);
+
   // 클릭하여 확대할 참가자
   const [expandedParticipant, setExpandedParticipant] = useState<Participant | null>(null);
   const expandedVideoRef = useRef<HTMLVideoElement>(null);
@@ -67,9 +71,6 @@ export default function RoomPage() {
   const [remoteScreenShareTrack, setRemoteScreenShareTrack] = useState<Track | null>(null);
   const [localScreenShareTrack, setLocalScreenShareTrack] = useState<LocalVideoTrack | null>(null);
 
-  // [DIAGNOSTIC] Using port 7885 to avoid 7880 port conflicts on Windows
-  const WS_URL = import.meta.env.VITE_LIVEKIT_URL || 'ws://127.0.0.1:7885'; 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // 확대된 참가자 카메라 트랙 연결
@@ -88,7 +89,7 @@ export default function RoomPage() {
     if (!token) return navigate('/');
 
     try {
-      const res = await fetch(`${API_URL}/livekit/token`, {
+      const res = await fetch(`${configService.getApiUrl()}/livekit/token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -113,7 +114,7 @@ export default function RoomPage() {
         }
       });
 
-      console.log('[DEBUG] Attempting Signaling Connection to:', WS_URL);
+      console.log('[DEBUG] Attempting Signaling Connection to:', configService.getLiveKitUrl());
       console.log('[DEBUG] Token length:', data.token.length);
       
       newRoom
@@ -143,7 +144,7 @@ export default function RoomPage() {
         });
 
       console.time('[DIAGNOSTIC] LK_CONNECT');
-      await newRoom.connect(WS_URL, data.token);
+      await newRoom.connect(configService.getLiveKitUrl(), data.token);
       console.log('[DEBUG] LiveKit Connection Established Successfully!');
       console.timeEnd('[DIAGNOSTIC] LK_CONNECT');
 
@@ -169,7 +170,7 @@ export default function RoomPage() {
         message: e.message,
         name: e.name,
         code: e.code,
-        url: WS_URL
+        url: configService.getLiveKitUrl()
       });
       
       const errorMsg = e.message || '알 수 없는 연결 에러';
@@ -178,10 +179,10 @@ export default function RoomPage() {
       // 즉시 추가 진단 실행
       console.log('[DIAGNOSTIC] Running network health check...');
       try {
-        const pingLK = await fetch(WS_URL.replace('ws://', 'http://').replace('wss://', 'https://')).then(() => 'Reachable').catch(err => `Unreachable: ${err.message}`);
+        const pingLK = await fetch(configService.getLiveKitUrl().replace('ws://', 'http://').replace('wss://', 'https://')).then(() => 'Reachable').catch(err => `Unreachable: ${err.message}`);
         console.warn('[DIAGNOSTIC] HTTP Ping to LiveKit:', pingLK);
         
-        const pingBE = await fetch(`${API_URL}/health`).then(() => 'Reachable').catch(err => `Unreachable: ${err.message}`);
+        const pingBE = await fetch(`${configService.getApiUrl()}/health`).then(() => 'Reachable').catch(err => `Unreachable: ${err.message}`);
         console.warn('[DIAGNOSTIC] HTTP Ping to Backend:', pingBE);
         
         alert(`접속 실패 상세 진단:\n1. 에러: ${errorMessage || errorMsg}\n2. LiveKit 서버 상태: ${pingLK}\n3. 백엔드 서버 상태: ${pingBE}\n\n* 개발자 도구(Console)에서 더 자세한 로그를 확인하세요.`);
@@ -197,7 +198,7 @@ export default function RoomPage() {
       const fetchDrawingHistory = async () => {
         const token = localStorage.getItem('token');
         try {
-          const res = await fetch(`${API_URL}/channels/${id}/drawings`, {
+          const res = await fetch(`${configService.getApiUrl()}/channels/${id}/drawings`, {
             headers: { Authorization: `Bearer ${token}` }
           });
           const history = await res.json();
@@ -210,7 +211,7 @@ export default function RoomPage() {
       };
       fetchDrawingHistory();
     }
-  }, [isConnected, id, API_URL]);
+  }, [isConnected, id]);
 
   // 판서 데이터 저장 (Debounced)
   const saveDrawingHistory = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -222,7 +223,7 @@ export default function RoomPage() {
       
       const token = localStorage.getItem('token');
       try {
-        await fetch(`${API_URL}/channels/${id}/drawings`, {
+        await fetch(`${configService.getApiUrl()}/channels/${id}/drawings`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -360,21 +361,24 @@ export default function RoomPage() {
     };
   }, [remoteScreenShareTrack, room]);
 
-  // 로컬 참가자 미디어 상태 변화 감지 (툴바 숨김 시 오버레이 동기화)
+  // 로컬 참가자 미디어 및 발화 상태 변화 감지 (툴바 숨김 시 오버레이 동기화)
   useEffect(() => {
     if (!room) return;
     const handleUpdate = () => setLocalMediaUpdate(v => v + 1);
+    const handleSpeaking = () => setIsLocalSpeaking(room.localParticipant.isSpeaking);
     
     room.localParticipant.on(ParticipantEvent.TrackMuted, handleUpdate);
     room.localParticipant.on(ParticipantEvent.TrackUnmuted, handleUpdate);
     room.localParticipant.on(ParticipantEvent.LocalTrackPublished, handleUpdate);
     room.localParticipant.on(ParticipantEvent.LocalTrackUnpublished, handleUpdate);
+    room.localParticipant.on(ParticipantEvent.IsSpeakingChanged, handleSpeaking);
 
     return () => {
       room.localParticipant.off(ParticipantEvent.TrackMuted, handleUpdate);
       room.localParticipant.off(ParticipantEvent.TrackUnmuted, handleUpdate);
       room.localParticipant.off(ParticipantEvent.LocalTrackPublished, handleUpdate);
       room.localParticipant.off(ParticipantEvent.LocalTrackUnpublished, handleUpdate);
+      room.localParticipant.off(ParticipantEvent.IsSpeakingChanged, handleSpeaking);
     };
   }, [room]);
 
@@ -571,6 +575,7 @@ export default function RoomPage() {
               onLeaveRoom={leaveRoom}
               isGridVisible={isGridVisible}
               onToggleGrid={() => setIsGridVisible(v => !v)}
+              isSpeaking={isLocalSpeaking}
             />
           </div>
 
@@ -588,7 +593,10 @@ export default function RoomPage() {
       {/* 우하단 상태 오버레이 (툴바가 숨겨졌을 때만 표시) */}
       {!isToolbarVisible && isConnected && room && (
         <div className="absolute bottom-6 right-6 z-[60] flex items-center gap-2 bg-zinc-900/80 backdrop-blur-md px-4 py-2 rounded-2xl border border-zinc-800 pointer-events-none animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <div className={`p-1.5 rounded-lg ${room.localParticipant.isMicrophoneEnabled ? 'text-zinc-400' : 'text-red-500 bg-red-500/10'}`}>
+          <div className={`p-1.5 rounded-lg transition-colors duration-200 ${
+            !room.localParticipant.isMicrophoneEnabled ? 'text-red-500 bg-red-500/10' : 
+            isLocalSpeaking ? 'text-green-500 bg-green-500/10 shadow-[0_0_10px_rgba(34,197,94,0.2)]' : 'text-zinc-400'
+          }`}>
             {room.localParticipant.isMicrophoneEnabled ? <Mic size={16} /> : <MicOff size={16} />}
           </div>
           <div className={`p-1.5 rounded-lg ${room.localParticipant.isCameraEnabled ? 'text-zinc-400' : 'text-red-500 bg-red-500/10'}`}>

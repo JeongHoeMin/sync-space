@@ -1,0 +1,16 @@
+{
+    admin off
+    debug
+}
+
+# 백엔드 API (표준 HTTPS 포트 사용)
+:443 {
+    reverse_proxy backend:3000
+    tls /certs/cert.pem /certs/key.pem
+}
+
+# LiveKit Signaling (전용 포트 유지)
+:7885 {
+    reverse_proxy livekit:7880
+    tls /certs/cert.pem /certs/key.pem
+}

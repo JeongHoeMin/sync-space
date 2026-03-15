@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { configService } from '../services/config.service';
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -49,9 +50,8 @@ export default function AuthPage() {
     e.preventDefault();
     setErrorMessage(null);
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
       const endpoint = isLogin ? '/auth/login' : '/auth/register';
-      const res = await fetch(`${API_URL}${endpoint}`, {
+      const res = await fetch(`${configService.getApiUrl()}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),

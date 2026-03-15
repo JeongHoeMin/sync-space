@@ -26,9 +26,9 @@ services:
     volumes:
       - ./livekit.yaml:/etc/livekit.yaml
     ports:
-      - "7885:7880"
-      - "7881:7881"
-      - "7882:7882/udp"
+      # Signaling 포트(7880)는 Caddy를 통해 노출되므로 직접 노출하지 않음
+      - "7881:7881"   # RTC TCP
+      - "7882:7882/udp" # RTC UDP
 
   backend:
     build:
@@ -46,11 +46,25 @@ services:
       JWT_SECRET: super_secret_dev_key
       LIVEKIT_API_KEY: devkey
       LIVEKIT_API_SECRET: secret
-    ports:
-      - "3000:3000"
+      APP_URL: https://19.19.20.49:3000 # Caddy를 통하므로 https
+    expose:
+      - "3000"
     depends_on:
       - db
       - redis
+      - livekit
+
+  caddy:
+    image: caddy:latest
+    container_name: sync-space-proxy
+    ports:
+      - "443:443"
+      - "7885:7885"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./sync-space-server/certs:/certs:ro
+    depends_on:
+      - backend
       - livekit
 
 volumes:
